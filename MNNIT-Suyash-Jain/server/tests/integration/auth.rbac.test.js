@@ -26,6 +26,28 @@ describe('Auth & RBAC Integration Tests (JWT + Supervisor Approvals)', () => {
   });
 
   describe('JWT Token Authentication', () => {
+    it('authenticates demo operator user without requiring MongoDB', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'operator@warehouse.com', password: 'Operator123!' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.token).toBeDefined();
+      expect(response.body.user.role).toBe('Operator');
+    });
+
+    it('authenticates demo supervisor user without requiring MongoDB', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'supervisor@warehouse.com', password: 'Supervisor123!' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.token).toBeDefined();
+      expect(response.body.user.role).toBe('Supervisor');
+    });
+
     it('returns 401 Unauthorized when no token or API key is provided', async () => {
       const response = await request(app)
         .post('/api/v1/route')

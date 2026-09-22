@@ -8,7 +8,7 @@ export const connectDB = async (customUri) => {
     return conn;
   } catch (error) {
     console.error(`MongoDB Connection Error: ${error.message}`);
-    if (process.env.NODE_ENV !== 'test') {
+    if (process.env.NODE_ENV !== 'test' && !process.env.VERCEL) {
       process.exit(1);
     }
     throw error;

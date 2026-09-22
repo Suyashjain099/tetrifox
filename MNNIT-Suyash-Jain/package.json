@@ -1,9 +1,15 @@
 {
   "name": "tetrifox-parcel-routing-system",
   "version": "1.0.0",
+  "private": true,
   "description": "Tetrifox Parcel Routing System Root Package",
+  "workspaces": [
+    "client",
+    "server"
+  ],
   "scripts": {
-    "start": "npm start --prefix server",
-    "test": "npm test --prefix server"
+    "build": "npm run build --workspace=client",
+    "start": "npm start --workspace=server",
+    "test": "npm test --workspace=server"
   }
 }
