@@ -34,9 +34,15 @@ export const LoginPage = ({ onLoginSuccess }) => {
         body: JSON.stringify(credentials),
       });
 
-      const data = await res.json();
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        // Handle non-JSON server responses gracefully
+      }
+
       if (!res.ok) {
-        throw new Error(data.message || 'Authentication failed');
+        throw new Error(data.message || `Server responded with status ${res.status}`);
       }
 
       onLoginSuccess(data.token, data.user);
@@ -59,9 +65,15 @@ export const LoginPage = ({ onLoginSuccess }) => {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (e) {
+        // Handle non-JSON server responses gracefully
+      }
+
       if (!res.ok) {
-        throw new Error(data.message || 'Authentication failed');
+        throw new Error(data.message || `Server responded with status ${res.status}`);
       }
 
       onLoginSuccess(data.token, data.user);

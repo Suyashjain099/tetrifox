@@ -2,6 +2,7 @@
   "name": "tetrifox-parcel-routing-system",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Tetrifox Parcel Routing System Root Package",
   "workspaces": [
     "client",
@@ -11,5 +12,17 @@
     "build": "npm run build --workspace=client",
     "start": "npm start --workspace=server",
     "test": "npm test --workspace=server"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "fast-xml-parser": "^4.5.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.2.0",
+    "multer": "^1.4.5-lts.1",
+    "winston": "^3.11.0",
+    "zod": "^3.22.4"
   }
 }

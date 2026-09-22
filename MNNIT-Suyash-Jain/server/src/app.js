@@ -33,13 +33,13 @@ if (fs.existsSync(clientDistPath)) {
   app.use(express.static(clientDistPath));
 }
 
-app.get('/health', (req, res) => {
+app.get(['/health', '/api/health', '/api/v1/health'], (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/config', configRoutes);
-app.use('/api/v1', routingRoutes);
+app.use(['/api/v1/auth', '/v1/auth'], authRoutes);
+app.use(['/api/v1/config', '/v1/config'], configRoutes);
+app.use(['/api/v1', '/v1'], routingRoutes);
 
 app.use((req, res, next) => {
   if (req.accepts('html')) {
