@@ -34,15 +34,9 @@ export const LoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
         body: JSON.stringify({ email, password }),
       });
 
-      let data = {};
-      try {
-        data = await res.json();
-      } catch (e) {
-        // Handle non-JSON server responses gracefully
-      }
-
+      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || `Server responded with status ${res.status}`);
+        throw new Error(data.message || 'Login failed');
       }
 
       onLoginSuccess(data.token, data.user);

@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { RoutingEngine } from '../domain/RoutingEngine.js';
 import { ParcelModel } from '../models/Parcel.model.js';
 import { BatchJobModel } from '../models/BatchJob.model.js';
@@ -6,7 +5,6 @@ import { parseXmlManifest } from '../utils/xmlParser.util.js';
 import { logger } from '../utils/logger.js';
 import { EU_COUNTRIES } from '../domain/rules/InternationalCustomsRule.js';
 
-export const inMemoryParcels = [];
 const engine = new RoutingEngine();
 
 export const routeSingleParcel = async (req, res) => {
@@ -62,8 +60,7 @@ export const routeSingleParcel = async (req, res) => {
     }
 
     let savedParcel = null;
-    const isDbConnected = mongoose.connection.readyState === 1 && process.env.NODE_ENV !== 'test_no_db';
-    if (isDbConnected) {
+    if (process.env.NODE_ENV !== 'test_no_db') {
       try {
         savedParcel = await ParcelModel.create({
           parcelId: routingResult.parcelId,
@@ -85,29 +82,6 @@ export const routeSingleParcel = async (req, res) => {
       } catch (dbError) {
         console.warn('Database save warning (single route):', dbError.message);
       }
-    }
-
-    if (!savedParcel) {
-      savedParcel = {
-        _id: `mem-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        parcelId: routingResult.parcelId,
-        warehouseId: assignedWarehouseId,
-        recipient: typeof recipient === 'object' ? recipient : { name: recipient || 'Unknown' },
-        weightKg: parcelInput.weightKg,
-        valueEur: parcelInput.valueEur,
-        destinationCountry: parcelInput.destinationCountry,
-        postalCode: parcelInput.postalCode,
-        department: routingResult.department,
-        requiresApproval: approvalStatus === 'PENDING',
-        approvalStatus,
-        approvedBy,
-        approvedAt,
-        releasedFromEscrow: false,
-        matchedRule: routingResult.matchedRule,
-        evaluatedRules: routingResult.evaluatedRules,
-        createdAt: new Date(),
-      };
-      inMemoryParcels.unshift(savedParcel);
     }
 
     return res.status(200).json({
@@ -221,8 +195,7 @@ export const routeBatchParcels = async (req, res) => {
       });
     }
 
-    const isDbConnected = mongoose.connection.readyState === 1 && process.env.NODE_ENV !== 'test_no_db';
-    if (isDbConnected) {
+    if (process.env.NODE_ENV !== 'test_no_db') {
       try {
         await ParcelModel.insertMany(processedParcels);
         await BatchJobModel.create({
@@ -236,14 +209,6 @@ export const routeBatchParcels = async (req, res) => {
       } catch (dbError) {
         console.warn('Database save warning (batch route):', dbError.message);
       }
-    } else {
-      processedParcels.forEach((p) => {
-        inMemoryParcels.unshift({
-          ...p,
-          _id: p._id || `mem-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          createdAt: new Date(),
-        });
-      });
     }
 
     return res.status(200).json({
@@ -273,19 +238,6 @@ export const getPendingApprovals = async (req, res) => {
       return res.status(200).json({ success: true, pendingParcels: [] });
     }
 
-    const isDbConnected = mongoose.connection.readyState === 1;
-    if (!isDbConnected) {
-      let pending = inMemoryParcels.filter((p) => p.approvalStatus === 'PENDING');
-      if (req.user?.warehouseId && req.user?.role !== 'Admin') {
-        pending = pending.filter((p) => p.warehouseId === req.user.warehouseId);
-      }
-      return res.status(200).json({
-        success: true,
-        warehouseId: req.user?.warehouseId || 'WH-AMS-01',
-        pendingParcels: pending,
-      });
-    }
-
     const filter = { approvalStatus: 'PENDING' };
     if (req.user?.warehouseId && req.user?.role !== 'Admin') {
       filter.warehouseId = req.user.warehouseId;
@@ -312,25 +264,6 @@ export const approveParcel = async (req, res) => {
         success: true,
         message: `Parcel ${id} approved by ${supervisorName}`,
         parcel: { parcelId: id, approvalStatus: 'APPROVED', approvedBy: supervisorName, approvedAt: new Date(), releasedFromEscrow: true },
-      });
-    }
-
-    const isDbConnected = mongoose.connection.readyState === 1;
-    if (!isDbConnected) {
-      const parcel = inMemoryParcels.find((p) => p._id === id || p.parcelId === id);
-      if (!parcel) {
-        return res.status(404).json({ error: 'Not Found', message: 'Parcel record not found' });
-      }
-      parcel.requiresApproval = false;
-      parcel.approvalStatus = 'APPROVED';
-      parcel.approvedBy = supervisorName;
-      parcel.approvedAt = new Date();
-      parcel.releasedFromEscrow = true;
-
-      return res.status(200).json({
-        success: true,
-        message: `Insurance clearance approved for parcel ${parcel.parcelId}`,
-        parcel,
       });
     }
 
@@ -372,26 +305,15 @@ export const getRecentApprovals = async (req, res) => {
       return res.status(200).json({ success: true, recentApprovals: [] });
     }
 
-    const isDbConnected = mongoose.connection.readyState === 1;
-    let approvedParcels = [];
-
-    if (isDbConnected) {
-      const filter = { approvalStatus: 'APPROVED', releasedFromEscrow: true };
-      if (req.user?.warehouseId && req.user?.role !== 'Admin') {
-        filter.warehouseId = req.user.warehouseId;
-      }
-
-      approvedParcels = await ParcelModel.find(filter)
-        .sort({ approvedAt: -1 })
-        .limit(6)
-        .lean();
-    } else {
-      let filtered = inMemoryParcels.filter((p) => p.approvalStatus === 'APPROVED' && p.releasedFromEscrow);
-      if (req.user?.warehouseId && req.user?.role !== 'Admin') {
-        filtered = filtered.filter((p) => p.warehouseId === req.user.warehouseId);
-      }
-      approvedParcels = filtered.slice(0, 6);
+    const filter = { approvalStatus: 'APPROVED', releasedFromEscrow: true };
+    if (req.user?.warehouseId && req.user?.role !== 'Admin') {
+      filter.warehouseId = req.user.warehouseId;
     }
+
+    const approvedParcels = await ParcelModel.find(filter)
+      .sort({ approvedAt: -1 })
+      .limit(6)
+      .lean();
 
     const formatted = approvedParcels.map((p) => {
       const country = p.destinationCountry ? String(p.destinationCountry).trim().toUpperCase() : 'NL';
@@ -450,16 +372,9 @@ export const getAnalyticsMetrics = async (req, res) => {
       });
     }
 
-    const isDbConnected = mongoose.connection.readyState === 1;
-    let allParcels = [];
-    if (isDbConnected) {
-      const warehouseIdFilter = req.user?.warehouseId && req.user?.role !== 'Admin' ? { warehouseId: req.user.warehouseId } : {};
-      allParcels = await ParcelModel.find(warehouseIdFilter).sort({ createdAt: -1 });
-    } else {
-      allParcels = req.user?.warehouseId && req.user?.role !== 'Admin'
-        ? inMemoryParcels.filter((p) => p.warehouseId === req.user.warehouseId)
-        : inMemoryParcels;
-    }
+    const warehouseIdFilter = req.user?.warehouseId && req.user?.role !== 'Admin' ? { warehouseId: req.user.warehouseId } : {};
+
+    const allParcels = await ParcelModel.find(warehouseIdFilter).sort({ createdAt: -1 });
     const totalParcels = allParcels.length;
 
     const departmentBreakdown = { Mail: 0, Regular: 0, Heavy: 0, Insurance: 0, Customs: 0 };
@@ -601,23 +516,10 @@ export const resetAnalyticsMetrics = async (req, res) => {
       : {};
 
     let deletedCount = 0;
-    const isDbConnected = mongoose.connection.readyState === 1 && process.env.NODE_ENV !== 'test_no_db';
-    if (isDbConnected) {
+    if (process.env.NODE_ENV !== 'test_no_db') {
       const pResult = await ParcelModel.deleteMany(warehouseIdFilter);
       await BatchJobModel.deleteMany(warehouseIdFilter);
       deletedCount = pResult.deletedCount || 0;
-    } else {
-      if (req.user?.warehouseId && req.user?.role !== 'Admin') {
-        for (let i = inMemoryParcels.length - 1; i >= 0; i--) {
-          if (inMemoryParcels[i].warehouseId === req.user.warehouseId) {
-            inMemoryParcels.splice(i, 1);
-            deletedCount++;
-          }
-        }
-      } else {
-        deletedCount = inMemoryParcels.length;
-        inMemoryParcels.length = 0;
-      }
     }
 
     logger.info('FACILITY_TELEMETRY_HISTORY_RESET', {

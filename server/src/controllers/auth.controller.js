@@ -1,36 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import mongoose from 'mongoose';
 import { UserModel } from '../models/User.model.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret-jwt-key';
-
-export const DEMO_USERS = [
-  {
-    _id: 'user-op-1',
-    name: 'Alex Operator',
-    email: 'operator@warehouse.com',
-    password: 'Operator123!',
-    role: 'Operator',
-    warehouseId: 'WH-AMS-01',
-  },
-  {
-    _id: 'user-sup-1',
-    name: 'Sarah Supervisor',
-    email: 'supervisor@warehouse.com',
-    password: 'Supervisor123!',
-    role: 'Supervisor',
-    warehouseId: 'WH-AMS-01',
-  },
-  {
-    _id: 'user-sup-2',
-    name: 'Mark Supervisor (Rotterdam)',
-    email: 'supervisor.rotterdam@warehouse.com',
-    password: 'Supervisor123!',
-    role: 'Supervisor',
-    warehouseId: 'WH-RTM-01',
-  },
-];
 
 export const login = async (req, res) => {
   try {
@@ -40,31 +12,18 @@ export const login = async (req, res) => {
       return res.status(400).json({ error: 'Bad Request', message: 'Email and password are required' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
-    let user = null;
-
-    // Check built-in demo users first
-    const demoUser = DEMO_USERS.find((u) => u.email.toLowerCase() === normalizedEmail);
-    if (demoUser && (password === demoUser.password || password === 'Operator123!' || password === 'Supervisor123!')) {
-      user = demoUser;
-    } else if (mongoose.connection.readyState === 1) {
-      try {
-        const dbUser = await UserModel.findOne({ email: normalizedEmail });
-        if (dbUser) {
-          const isMatch = await bcrypt.compare(password, dbUser.password);
-          if (isMatch) user = dbUser;
-        }
-      } catch (err) {
-        console.warn('DB lookup failed, continuing with demo user check');
-      }
-    }
-
+    const user = await UserModel.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(401).json({ error: 'Unauthorized', message: 'Invalid email or password' });
     }
 
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Unauthorized', message: 'Invalid email or password' });
+    }
+
     const payload = {
-      id: user._id || user.id,
+      id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,

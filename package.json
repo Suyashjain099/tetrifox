@@ -1,0 +1,9 @@
+{
+  "name": "tetrifox-parcel-routing-system",
+  "version": "1.0.0",
+  "description": "Tetrifox Parcel Routing System Root Package",
+  "scripts": {
+    "start": "npm start --prefix server",
+    "test": "npm test --prefix server"
+  }
+}
