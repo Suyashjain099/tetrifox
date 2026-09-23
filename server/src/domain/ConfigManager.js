@@ -21,6 +21,35 @@ export class ConfigManager {
     return [...this.#config.history];
   }
 
+  static getFullState() {
+    return {
+      mailMaxWeightKg: this.#config.mailMaxWeightKg,
+      regularMaxWeightKg: this.#config.regularMaxWeightKg,
+      insuranceMinThresholdEur: this.#config.insuranceMinThresholdEur,
+      version: this.#config.version,
+      history: [...this.#config.history],
+    };
+  }
+
+  static loadFromState(savedState) {
+    if (!savedState) return;
+    if (typeof savedState.mailMaxWeightKg === 'number') {
+      this.#config.mailMaxWeightKg = savedState.mailMaxWeightKg;
+    }
+    if (typeof savedState.regularMaxWeightKg === 'number') {
+      this.#config.regularMaxWeightKg = savedState.regularMaxWeightKg;
+    }
+    if (typeof savedState.insuranceMinThresholdEur === 'number') {
+      this.#config.insuranceMinThresholdEur = savedState.insuranceMinThresholdEur;
+    }
+    if (typeof savedState.version === 'number') {
+      this.#config.version = savedState.version;
+    }
+    if (Array.isArray(savedState.history)) {
+      this.#config.history = [...savedState.history];
+    }
+  }
+
   static validateConfig(newConfig) {
     const { mailMaxWeightKg, regularMaxWeightKg, insuranceMinThresholdEur } = newConfig;
 

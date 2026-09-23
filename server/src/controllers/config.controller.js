@@ -1,5 +1,54 @@
 import { ConfigManager } from '../domain/ConfigManager.js';
+import { RuleConfigModel } from '../models/RuleConfig.model.js';
 import { logger } from '../utils/logger.js';
+
+export const initRuleConfig = async () => {
+  if (process.env.NODE_ENV === 'test_no_db') {
+    return;
+  }
+  try {
+    const existing = await RuleConfigModel.findOne().sort({ createdAt: -1 });
+    if (existing) {
+      ConfigManager.loadFromState(existing);
+      console.log(`Loaded persisted Rule Configuration (v${existing.version}) from MongoDB`);
+    } else {
+      const fullState = ConfigManager.getFullState();
+      await RuleConfigModel.create({
+        ...fullState,
+        updatedBy: 'Initial Seed',
+      });
+      console.log('Seeded default Rule Configuration (v1) into MongoDB');
+    }
+  } catch (error) {
+    console.warn('Rule configuration MongoDB sync warning (init):', error.message);
+  }
+};
+
+const persistConfigToDb = async (updatedBy) => {
+  if (process.env.NODE_ENV === 'test_no_db') {
+    return;
+  }
+  try {
+    const fullState = ConfigManager.getFullState();
+    const existing = await RuleConfigModel.findOne().sort({ createdAt: -1 });
+    if (existing) {
+      existing.mailMaxWeightKg = fullState.mailMaxWeightKg;
+      existing.regularMaxWeightKg = fullState.regularMaxWeightKg;
+      existing.insuranceMinThresholdEur = fullState.insuranceMinThresholdEur;
+      existing.version = fullState.version;
+      existing.history = fullState.history;
+      existing.updatedBy = updatedBy;
+      await existing.save();
+    } else {
+      await RuleConfigModel.create({
+        ...fullState,
+        updatedBy,
+      });
+    }
+  } catch (dbError) {
+    console.warn('Rule configuration MongoDB sync warning (save):', dbError.message);
+  }
+};
 
 export const getRuleConfig = async (req, res) => {
   try {
@@ -29,6 +78,8 @@ export const updateRuleConfig = async (req, res) => {
       updatedBy
     );
 
+    await persistConfigToDb(updatedBy);
+
     logger.info('DYNAMIC_RULE_CONFIG_UPDATED', {
       updatedBy,
       newConfig,
@@ -53,6 +104,8 @@ export const rollbackRuleConfig = async (req, res) => {
   try {
     const updatedBy = req.user?.name || 'Supervisor';
     const rolledBackConfig = ConfigManager.rollback(updatedBy);
+
+    await persistConfigToDb(updatedBy);
 
     logger.warn('DYNAMIC_RULE_CONFIG_ROLLED_BACK', {
       updatedBy,
